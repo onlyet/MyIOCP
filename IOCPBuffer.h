@@ -4,8 +4,8 @@ typedef struct IOCPBufferData
 {
 	ULONG m_nRefs;
 	BYTE* m_pData;
-	DWORD m_dwAllocLength;
-	DWORD m_dwDataLength;
+	DWORD m_dwAllocLength;      //实际分配的内存大小，最小1024
+	DWORD m_dwDataLength;       //希望分配的数据大小，可能才64
 
 	IOCPBufferData( DWORD dwAllocLength );
 	IOCPBufferData( );
@@ -39,10 +39,11 @@ public:
 	ULONG GetLength();
 };
 
+//管理内存池：IOCPMemPool <IOCPBufferData>
 class IOCPBufferMngr
 {
 private:
-	IOCPMutex m_MutexLock;
+	IOCPMutex m_MutexLock;                          //保护内存池：std::list<IOCPBufferData>
 	IOCPMemPool <IOCPBufferData> m_BufferMemPool;
 	static IOCPBufferMngr* m_Instance;
 private:

@@ -217,6 +217,7 @@ SOCKET CBaseIOCPServer::CreateSocket(void)
 		return sdSocket;
 	}
 
+    //这里将SO_SNDBUF设为0是什么意思？
 	nZero = 0;
 	nRet = setsockopt(sdSocket, SOL_SOCKET, SO_SNDBUF, (char *)&nZero, sizeof(nZero));
 	if (nRet == SOCKET_ERROR) {
@@ -281,14 +282,10 @@ BOOL CBaseIOCPServer::CreateAcceptSocket(PPER_IO_CONTEXT lpPerIOContext) {
 	memset(lpPerIOContext->IOCPBuffer->m_pData->m_pData, 0, lpPerIOContext->IOCPBuffer->m_pData->m_dwDataLength);
 	memset(&lpPerIOContext->Overlapped, 0, sizeof(lpPerIOContext->Overlapped));
 
-	nRet = m_lpfnAcceptEx(m_sdListen,
-		lpPerIOContext->SocketAccept,
-		lpPerIOContext->IOCPBuffer->m_pData->m_pData,
-		0,
-		sizeof(sockaddr_in) + 16,
-		sizeof(sockaddr_in) + 16,
-		&dwRecvNumBytes,
-		&lpPerIOContext->Overlapped);
+    //这里不接收用户数据？
+	nRet = m_lpfnAcceptEx(m_sdListen, lpPerIOContext->SocketAccept, lpPerIOContext->IOCPBuffer->m_pData->m_pData,
+		0, sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16,
+		&dwRecvNumBytes, &lpPerIOContext->Overlapped);
 
 	if (nRet == FALSE && (ERROR_IO_PENDING != WSAGetLastError())) {
 		myprintf("AcceptEx() failed: %d\n", WSAGetLastError());
@@ -355,6 +352,7 @@ VOID CBaseIOCPServer::PostClientIoRead(PPER_SOCKET_CONTEXT lpPerSocketContext, P
 	DWORD dwFlags = 0;
 	DWORD dwNumberRecvd = 0;
 
+    //为什么加锁？
 	lpPerSocketContext->m_Lock.Lock();
 
 	PostResult = PostIoSuccess;
@@ -458,6 +456,7 @@ VOID CBaseIOCPServer::OnClientIoAccept(PPER_SOCKET_CONTEXT lpPerSocketContext, P
 	NotifyNewConnection(lpPerAcceptSocketContext);
 
 	PPER_IO_CONTEXT lpPerRecvIOContext = &lpPerAcceptSocketContext->m_RecvContext;
+    //为什么recvBuf为4096？
 	lpPerRecvIOContext->IOCPBuffer = OP_NEW_1<CIOCPBuffer, DWORD>(_FILE_AND_LINE_, BASE_IOCP_RECEIVE_BUFFER_SIZE);
 
 	PostClientIoRead(lpPerAcceptSocketContext, lpPerRecvIOContext, PostResult);
@@ -481,8 +480,10 @@ VOID CBaseIOCPServer::OnClientIoRead(PPER_SOCKET_CONTEXT lpPerSocketContext, PPE
 	//收到数据,设置缓冲区,并且通知用户已经收到了数据
 	lpPerIOContext->IOCPBuffer->m_pData->m_dwDataLength = dwIoSize;
 
+    //业务处理，解包
 	NotifyReceivedPackage(lpPerSocketContext, lpPerIOContext->IOCPBuffer);
 	//更换缓冲区
+    //这里将CIOCPBufferData放回内存池尾部，并从头部取一个新的CIOCPBuffer，为什么要换缓冲区？
 	OP_DELETE<CIOCPBuffer>(lpPerIOContext->IOCPBuffer, _FILE_AND_LINE_);
 	lpPerIOContext->IOCPBuffer = OP_NEW_1<CIOCPBuffer, DWORD>(_FILE_AND_LINE_, BASE_IOCP_RECEIVE_BUFFER_SIZE);
 

@@ -5,7 +5,7 @@ typedef struct IOCPBufferData
 	ULONG m_nRefs;
 	BYTE* m_pData;
 	DWORD m_dwAllocLength;      //实际分配的内存大小，最小1024
-	DWORD m_dwDataLength;       //希望分配的数据大小，可能才64
+	DWORD m_dwDataLength;       //postRecv的buffer长度，或者是实际接收到的数据长度
 
 	IOCPBufferData( DWORD dwAllocLength );
 	IOCPBufferData( );

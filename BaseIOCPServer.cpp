@@ -218,6 +218,7 @@ SOCKET CBaseIOCPServer::CreateSocket(void)
 	}
 
     //这里将SO_SNDBUF设为0是什么意思？
+    //直接使用应用层buffer发送数据，避免了内存拷贝到内核
 	nZero = 0;
 	nRet = setsockopt(sdSocket, SOL_SOCKET, SO_SNDBUF, (char *)&nZero, sizeof(nZero));
 	if (nRet == SOCKET_ERROR) {
@@ -353,6 +354,7 @@ VOID CBaseIOCPServer::PostClientIoRead(PPER_SOCKET_CONTEXT lpPerSocketContext, P
 	DWORD dwNumberRecvd = 0;
 
     //为什么加锁？
+    //保证postRecv操作的socket是有效的，也就是还没有closesocket
 	lpPerSocketContext->m_Lock.Lock();
 
 	PostResult = PostIoSuccess;
@@ -394,7 +396,8 @@ VOID CBaseIOCPServer::PostClientIoWrite(PPER_SOCKET_CONTEXT lpPerSocketContext, 
 	DWORD dwFlags = 0;
 	DWORD dwNumberSent = 0;
 
-	lpPerSocketContext->m_Lock.Lock();
+    //保证postRecv操作的socket是有效的，也就是还没有closesocket
+    lpPerSocketContext->m_Lock.Lock();
 
 	PostResult = PostIoSuccess;
 
@@ -439,7 +442,6 @@ VOID CBaseIOCPServer::OnClientIoAccept(PPER_SOCKET_CONTEXT lpPerSocketContext, P
 	}
 
 	IO_POST_RESULT PostResult;
-
 
 	//句柄保存出来,并且立即投递下一个AcceptEx操作
 	SOCKET SocketAccept = lpPerIOContext->SocketAccept;
@@ -569,7 +571,6 @@ DWORD WINAPI CBaseIOCPServer::WorkerThread(LPVOID Param)
 			INFINITE
 		);
 
-
 		//如果投递的是NULL消息则为退出消息
 		if (lpCompletionKey == NULL) {
 			return 0;
@@ -632,7 +633,6 @@ BOOL CBaseIOCPServer::Startup(USHORT nPort, DWORD dwWorkerThreadCount, DWORD dwM
 
 	UpdateCompletionPort(m_sdListen, (DWORD_PTR)this);
 
-	//创建一些AcceptEx消息并投递到IOCP
 	//AcceptEx是IOCP模型下的高效接收函数
 	//支持多线程接收客户的连接
 	for (DWORD dwThreadIndex = 0; dwThreadIndex < dwWorkerThreadCount; dwThreadIndex++) {
@@ -799,5 +799,5 @@ VOID CBaseIOCPServer::NotifyWritePackage(PPER_SOCKET_CONTEXT lpPerSocketContext,
 }
 VOID CBaseIOCPServer::NotifyReceivedPackage(PPER_SOCKET_CONTEXT lpPerSocketContext, CIOCPBuffer* pBuffer)
 {
-
+    Send(lpPerSocketContext, pBuffer);
 }
